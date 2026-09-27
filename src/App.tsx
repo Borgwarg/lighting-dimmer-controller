@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { clamp, defaultEffects, defaultGroups, initialFixtures, type EffectName, type Fixture, type Group, type ProgramStep, type SavedSequence } from './types'
 
-const totalStageWidth = 760
-const totalStageHeight = 400
-
 const cycleTargets = (fixtures: Fixture[], selection: number[]) => {
   if (selection.length) {
     return selection
@@ -23,8 +20,8 @@ function App() {
   const [selectedIds, setSelectedIds] = useState<number[]>([1, 2, 3, 4, 5, 6])
   const [masterLevel, setMasterLevel] = useState<number>(100)
   const [bpm, setBpm] = useState<number>(120)
-  const [effect, setEffect] = useState<EffectName>('chase')
-  const [effectSettings, setEffectSettings] = useState({ width: 2, phase: 0, speed: 1 })
+  const [effect, setEffect] = useState<EffectName | null>('chase')
+  const [effectSettings, setEffectSettings] = useState({ width: 2, phase: 0 })
   const [flashOn, setFlashOn] = useState(false)
   const [groupName, setGroupName] = useState('')
   const [fixtureName, setFixtureName] = useState('')
@@ -50,6 +47,10 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (!effect) {
+      return
+    }
+
     setFixtures((existing) => {
       const targetIds = cycleTargets(existing, selectedIds)
       const next = existing.map((fixture) => ({ ...fixture }))
@@ -68,7 +69,7 @@ function App() {
       const width = clamp(effectSettings.width, 1, Math.max(1, targetIds.length))
       const phaseIndex = clamp(effectSettings.phase, 0, 100) / 100
       const phaseOffset = Math.floor(targetIds.length * phaseIndex)
-      const cycleStep = Math.floor((beamTick * (bpm / 30) * effectSettings.speed) % targetIds.length)
+      const cycleStep = Math.floor((beamTick * (bpm / 30)) % targetIds.length)
       const activeSet = new Set<number>()
 
       for (let index = 0; index < width; index += 1) {
@@ -80,8 +81,8 @@ function App() {
         case 'chase': {
           return next.map((fixture) => {
             const isIn = activeSet.has(fixture.id)
-            const level = isIn ? clamp(masterLevel * 0.9, 0, 100) : clamp(fixture.level * 0.82, 0, 100)
-            return { ...fixture, level, on: isIn || fixture.on }
+            const level = isIn ? clamp(masterLevel * 0.9, 0, 100) : 0
+            return { ...fixture, level, on: isIn }
           })
         }
         case 'fade': {
@@ -120,8 +121,8 @@ function App() {
             const shouldSpark = sparkleChance > 0.75
             return {
               ...fixture,
-              level: shouldSpark ? clamp(masterLevel * 1.2, 0, 100) : clamp(fixture.level * 0.62, 0, 100),
-              on: shouldSpark || fixture.on,
+              level: shouldSpark ? clamp(masterLevel * 1.2, 0, 100) : 0,
+              on: shouldSpark,
             }
           })
         }
@@ -216,10 +217,12 @@ function App() {
 
     setFixtures((current) => current.filter((fixture) => !selectedIds.includes(fixture.id)))
     setGroups((current) =>
-      current.map((group) => ({
-        ...group,
-        fixtureIds: group.fixtureIds.filter((id) => !selectedIds.includes(id)),
-      })),
+      current.map((group) => (
+        {
+          ...group,
+          fixtureIds: group.fixtureIds.filter((id) => !selectedIds.includes(id)),
+        }
+      )),
     )
     setSelectedIds([])
   }
@@ -292,14 +295,27 @@ function App() {
 
   const tapBpm = () => {
     const now = performance.now()
-    tapTimes.current = [...tapTimes.current, now].slice(-4)
+    tapTimes.current = [...tapTimes.current, now].slice(-8)
+    
     if (tapTimes.current.length >= 2) {
-      const diff = tapTimes.current[tapTimes.current.length - 1] - tapTimes.current[0]
-      if (diff > 0) {
-        const nextBpm = clamp(Math.round((60000 * (tapTimes.current.length - 1)) / diff), 40, 220)
+      const intervals: number[] = []
+      for (let i = 1; i < tapTimes.current.length; i++) {
+        intervals.push(tapTimes.current[i] - tapTimes.current[i - 1])
+      }
+      
+      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length
+      if (avgInterval > 0) {
+        const nextBpm = clamp(Math.round(60000 / avgInterval), 40, 220)
         setBpm(nextBpm)
       }
     }
+  }
+
+  const stopAllEffects = () => {
+    setEffect(null)
+    setFlashOn(false)
+    setIsSequencePlaying(false)
+    setFixtures((current) => current.map((fixture) => ({ ...fixture, level: 0, on: false })))
   }
 
   const activeBeamCount = fixtures.filter((fixture) => fixture.level > 25).length
@@ -391,10 +407,20 @@ function App() {
 
         <section className="viewer-panel">
           <div className="viewer-header">
-            <h3>Beam Viewer</h3>
-            <span>{activeBeamCount} active beams</span>
+            <h3>Fixture View</h3>
+            <span>{activeBeamCount} active fixtures</span>
           </div>
-          <BeamViewer fixtures={fixtures} selectedIds={selectedIds} tick={beamTick} />
+          <FixtureViewer 
+            fixtures={fixtures} 
+            selectedIds={selectedIds} 
+            onSelectFixture={(id) => {
+              setSelectedIds((current) =>
+                current.includes(id)
+                  ? current.filter((fid) => fid !== id)
+                  : [...current, id],
+              )
+            }}
+          />
         </section>
 
         <section className="effects-panel">
@@ -438,21 +464,6 @@ function App() {
               />
               <span>{effectSettings.phase}</span>
             </label>
-
-            <label>
-              Speed
-              <input
-                type="range"
-                min={1}
-                max={10}
-                step={0.1}
-                value={effectSettings.speed}
-                onChange={(event) =>
-                  setEffectSettings((current) => ({ ...current, speed: Number(event.target.value) }))
-                }
-              />
-              <span>{effectSettings.speed.toFixed(1)}x</span>
-            </label>
           </div>
 
           <div className="bpm-bar">
@@ -460,9 +471,20 @@ function App() {
               <span className="label">BPM</span>
               <strong>{bpm}</strong>
             </div>
-            <button onClick={tapBpm}>Tap BPM</button>
-            <button className="trigger" onMouseDown={() => setFlashOn(true)} onMouseUp={() => setFlashOn(false)} onMouseLeave={() => setFlashOn(false)}>
+            <button onClick={tapBpm} className="tap-button">Tap BPM</button>
+            <button 
+              className="trigger" 
+              onMouseDown={() => setFlashOn(true)} 
+              onMouseUp={() => setFlashOn(false)} 
+              onMouseLeave={() => setFlashOn(false)}
+            >
               Flash Trigger
+            </button>
+            <button 
+              className="stop-button"
+              onClick={stopAllEffects}
+            >
+              Stop
             </button>
           </div>
         </section>
@@ -492,7 +514,9 @@ function App() {
           </div>
 
           <div className="sequence-control">
-            <button onClick={() => setIsSequencePlaying((current) => !current)}>{isSequencePlaying ? 'Stop' : 'Play'}</button>
+            <button onClick={() => setIsSequencePlaying((current) => !current)}>
+              {isSequencePlaying ? 'Stop' : 'Play'}
+            </button>
           </div>
         </section>
       </main>
@@ -546,61 +570,86 @@ function App() {
   )
 }
 
-function BeamViewer({ fixtures, selectedIds, tick }: { fixtures: Fixture[]; selectedIds: number[]; tick: number }) {
+function FixtureViewer({ 
+  fixtures, 
+  selectedIds, 
+  onSelectFixture 
+}: { 
+  fixtures: Fixture[]
+  selectedIds: number[]
+  onSelectFixture: (id: number) => void
+}) {
+  const fixturesPerRow = 12
+  const dotSize = 40
+  const gap = 20
+  const padding = 20
+
+  const computedWidth = Math.min(fixtures.length, fixturesPerRow) * (dotSize + gap) + padding * 2
+  const rows = Math.ceil(fixtures.length / fixturesPerRow)
+  const computedHeight = rows * (dotSize + gap) + padding * 2
+
+  const getColorForLevel = (level: number): string => {
+    if (level === 0) {
+      return '#2a2a2a'
+    }
+    // Map 0-100 to different red intensities
+    // 0% = dark gray, 100% = full red (#ff0000)
+    const hue = 0
+    const saturation = 100
+    const lightness = (level / 100) * 50 // 0-50% lightness
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`
+  }
+
   return (
-    <svg viewBox={`0 0 ${totalStageWidth} ${totalStageHeight}`} className="beam-viewer">
-      <defs>
-        <linearGradient id="beamGlow" x1="0%" x2="100%" y1="0%" y2="0%">
-          <stop offset="0%" stopColor="rgba(255, 110, 110, 0.15)" />
-          <stop offset="50%" stopColor="rgba(255, 80, 80, 0.8)" />
-          <stop offset="100%" stopColor="rgba(255, 40, 40, 0.2)" />
-        </linearGradient>
-      </defs>
+    <svg 
+      viewBox={`0 0 ${computedWidth} ${computedHeight}`}
+      className="fixture-viewer"
+      style={{ width: '100%', height: 'auto' }}
+    >
+      <rect 
+        x={0} 
+        y={0} 
+        width={computedWidth} 
+        height={computedHeight} 
+        fill="#1a1a1a"
+        rx={8}
+      />
 
-      <rect x={0} y={0} width={totalStageWidth} height={totalStageHeight} rx={20} fill="#101420" />
-
-      {Array.from({ length: 10 }).map((_, index) => (
-        <line
-          key={`grid-${index}`}
-          x1={index * 80}
-          y1={0}
-          x2={index * 80}
-          y2={totalStageHeight}
-          stroke="rgba(255,255,255,0.06)"
-        />
-      ))}
-
-      {Array.from({ length: 7 }).map((_, index) => (
-        <line
-          key={`grid-h-${index}`}
-          x1={0}
-          y1={index * 60}
-          x2={totalStageWidth}
-          y2={index * 60}
-          stroke="rgba(255,255,255,0.05)"
-        />
-      ))}
-
-      {fixtures.map((fixture) => {
+      {fixtures.map((fixture, index) => {
+        const row = Math.floor(index / fixturesPerRow)
+        const col = index % fixturesPerRow
+        const cx = padding + col * (dotSize + gap) + dotSize / 2
+        const cy = padding + row * (dotSize + gap) + dotSize / 2
         const isSelected = selectedIds.includes(fixture.id)
-        const angle = ((fixture.id * 57 + tick * 2.6) % 360) * (Math.PI / 180)
-        const beamLength = 120 + fixture.level * 2.2
-        const endX = fixture.x + Math.cos(angle) * beamLength
-        const endY = fixture.y + Math.sin(angle) * beamLength
+        const color = getColorForLevel(fixture.level)
+        const outlineColor = isSelected ? '#b8956a' : 'rgba(255, 255, 255, 0.15)'
+        const outlineWidth = isSelected ? 3 : 2
 
         return (
           <g key={fixture.id}>
-            <circle cx={fixture.x} cy={fixture.y} r={8 + fixture.level / 18} fill={isSelected ? '#ff6b6b' : '#ffb5b5'} opacity={0.75} />
-            <line
-              x1={fixture.x}
-              y1={fixture.y}
-              x2={endX}
-              y2={endY}
-              stroke="url(#beamGlow)"
-              strokeWidth={1 + fixture.level / 35}
-              opacity={0.55 + fixture.level / 120}
+            <circle
+              cx={cx}
+              cy={cy}
+              r={dotSize / 2}
+              fill={color}
+              stroke={outlineColor}
+              strokeWidth={outlineWidth}
+              cursor="pointer"
+              onClick={() => onSelectFixture(fixture.id)}
             />
-            <circle cx={endX} cy={endY} r={2 + fixture.level / 28} fill="#ff5252" opacity={0.9} />
+            <text
+              x={cx}
+              y={cy}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize="10"
+              fill={fixture.level > 50 ? '#000' : '#aaa'}
+              cursor="pointer"
+              pointerEvents="none"
+              fontWeight="bold"
+            >
+              {fixture.level.toFixed(0)}
+            </text>
           </g>
         )
       })}
