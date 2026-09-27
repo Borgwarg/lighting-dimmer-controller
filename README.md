@@ -1,2 +1,14 @@
-# lighting-dimmer-controller
-Standalone software for controlling dimmers of lighting fixtures with FX engine, grouping, and effects
+# Logs
+npm-debug.log*
+
+# Build output
+/dist
+
+# Dependencies
+node_modules
+
+# OS
+.DS_Store
+
+# Editor
+.vscode

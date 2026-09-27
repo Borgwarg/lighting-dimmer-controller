@@ -1,0 +1,260 @@
+.app-shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 300px;
+  min-height: 100vh;
+  background: #0d1117;
+  color: #edf2ff;
+  font-family: Inter, 'Segoe UI', sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #171d2a;
+  color: #edf2ff;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  cursor: pointer;
+}
+
+button.active {
+  background: #ff4d4d;
+  border-color: #ff4d4d;
+  color: white;
+}
+
+button.trigger {
+  background: linear-gradient(135deg, #ff5b5b, #d63a3a);
+  border-color: #ff7373;
+}
+
+.sidebar,
+.main-panel {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 21, 31, 0.96);
+}
+
+.left-panel,
+.right-panel {
+  padding: 1rem;
+}
+
+.main-panel {
+  padding: 1rem 1.2rem;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.panel-header.with-space {
+  margin-top: 1.2rem;
+}
+
+.panel-header h2,
+.viewer-header h3,
+.topbar h1 {
+  margin: 0;
+}
+
+.input-row {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.input-row input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: white;
+  padding: 0.7rem 0.8rem;
+}
+
+.narrow {
+  margin-top: 0.5rem;
+}
+
+.fixture-list,
+.group-list,
+.sequence-list,
+.saved-fx-list,
+.fader-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.fixture-item,
+.sequence-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+}
+
+.fixture-item.selected {
+  border-color: rgba(255, 94, 94, 0.8);
+  background: rgba(255, 94, 94, 0.08);
+}
+
+.group-button,
+.fx-button {
+  text-align: left;
+  width: 100%;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.25rem;
+  color: #8fa6cf;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.72rem;
+}
+
+.master-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  min-width: 260px;
+}
+
+.master-wrap input {
+  width: 130px;
+}
+
+.viewer-panel,
+.effects-panel,
+.programmer-panel {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8rem;
+  color: #bfd1ff;
+}
+
+.beam-viewer {
+  width: 100%;
+  height: 420px;
+  border-radius: 16px;
+  box-shadow: inset 0 0 25px rgba(255, 72, 72, 0.06);
+  background: #0c1219;
+}
+
+.effect-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.controls-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.controls-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  color: #c3d4ff;
+}
+
+.controls-grid input,
+.fader-item input {
+  width: 100%;
+}
+
+.bpm-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.bpm-bar .label {
+  display: block;
+  color: #8ea9d8;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.bpm-bar strong {
+  font-size: 1.8rem;
+}
+
+.programmer-panel .panel-header {
+  margin-bottom: 0.8rem;
+}
+
+.sequence-control {
+  margin-top: 0.8rem;
+}
+
+.fader-label-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+  color: #dfeaff;
+}
+
+.fader-item {
+  padding: 0.7rem 0.6rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.saved-fx-panel {
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 1160px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar,
+  .main-panel {
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .controls-grid {
+    grid-template-columns: 1fr;
+  }
+}
