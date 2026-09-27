@@ -20,6 +20,8 @@ function App() {
   const [selectedIds, setSelectedIds] = useState<number[]>([1, 2, 3, 4, 5, 6])
   const [masterLevel, setMasterLevel] = useState<number>(100)
   const [bpm, setBpm] = useState<number>(120)
+  const [bpmMultiplier, setBpmMultiplier] = useState<number>(1)
+  const [bpmDivider, setBpmDivider] = useState<number>(1)
   const [effect, setEffect] = useState<EffectName | null>('chase')
   const [effectSettings, setEffectSettings] = useState({ width: 2, phase: 0 })
   const [flashOn, setFlashOn] = useState(false)
@@ -33,6 +35,7 @@ function App() {
   const [beamTick, setBeamTick] = useState(0)
   const tapTimes = useRef<number[]>([])
 
+  const effectiveBpm = (bpm * bpmMultiplier) / bpmDivider
   const selectedFixtures = useMemo(
     () => fixtures.filter((fixture) => selectedIds.includes(fixture.id)),
     [fixtures, selectedIds],
@@ -66,23 +69,36 @@ function App() {
         })
       }
 
-      const width = clamp(effectSettings.width, 1, Math.max(1, targetIds.length))
-      const phaseIndex = clamp(effectSettings.phase, 0, 100) / 100
-      const phaseOffset = Math.floor(targetIds.length * phaseIndex)
-      const cycleStep = Math.floor((beamTick * (bpm / 30)) % targetIds.length)
+      if (!targetIds.length) {
+        return next
+      }
+
+      const width = clamp(effectSettings.width, 1, targetIds.length)
+      const phaseRatio = clamp(effectSettings.phase, 0, 360) / 360
+      const targetCount = targetIds.length
+      const cycleStep = Math.floor((beamTick * (effectiveBpm / 60)) / 2.5) % targetCount
+      const phaseOffset = phaseRatio * (targetCount - 1)
+
       const activeSet = new Set<number>()
 
-      for (let index = 0; index < width; index += 1) {
-        const targetIndex = (cycleStep + phaseOffset + index) % targetIds.length
-        activeSet.add(targetIds[targetIndex])
+      for (let index = 0; index < targetCount; index += 1) {
+        const fixtureId = targetIds[index]
+        const slot = (cycleStep + phaseOffset * index) % targetCount
+        const isOn = slot < width
+        if (isOn) {
+          activeSet.add(fixtureId)
+        }
       }
 
       switch (effect) {
         case 'chase': {
           return next.map((fixture) => {
             const isIn = activeSet.has(fixture.id)
-            const level = isIn ? clamp(masterLevel * 0.9, 0, 100) : 0
-            return { ...fixture, level, on: isIn }
+            return {
+              ...fixture,
+              level: isIn ? clamp(masterLevel * 0.9, 0, 100) : 0,
+              on: isIn,
+            }
           })
         }
         case 'fade': {
@@ -131,7 +147,7 @@ function App() {
             if (!targetIds.includes(fixture.id)) {
               return fixture
             }
-            const strobeState = Math.sin((beamTick * (bpm / 12)) / 4) > 0
+            const strobeState = Math.sin((beamTick * (effectiveBpm / 12)) / 4) > 0
             return {
               ...fixture,
               level: strobeState ? clamp(masterLevel, 0, 100) : 0,
@@ -143,7 +159,7 @@ function App() {
           return next
       }
     })
-  }, [effect, effectSettings, flashOn, bpm, masterLevel, selectedIds, beamTick])
+  }, [effect, effectSettings, flashOn, effectiveBpm, masterLevel, selectedIds, beamTick])
 
   useEffect(() => {
     if (!isSequencePlaying || savedSequences.length === 0) {
@@ -151,7 +167,7 @@ function App() {
     }
 
     const sequence = savedSequences[0]
-    const frameMs = (60000 / bpm) / 2
+    const frameMs = (60000 / effectiveBpm) / 2
     const timer = window.setInterval(() => {
       setSequenceIndex((current) => {
         const nextIndex = current + 1
@@ -163,7 +179,7 @@ function App() {
     }, frameMs)
 
     return () => window.clearInterval(timer)
-  }, [bpm, isSequencePlaying, savedSequences])
+  }, [effectiveBpm, isSequencePlaying, savedSequences])
 
   useEffect(() => {
     if (!isSequencePlaying || savedSequences.length === 0) {
@@ -296,13 +312,13 @@ function App() {
   const tapBpm = () => {
     const now = performance.now()
     tapTimes.current = [...tapTimes.current, now].slice(-8)
-    
+
     if (tapTimes.current.length >= 2) {
       const intervals: number[] = []
       for (let i = 1; i < tapTimes.current.length; i++) {
         intervals.push(tapTimes.current[i] - tapTimes.current[i - 1])
       }
-      
+
       const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length
       if (avgInterval > 0) {
         const nextBpm = clamp(Math.round(60000 / avgInterval), 40, 220)
@@ -410,9 +426,9 @@ function App() {
             <h3>Fixture View</h3>
             <span>{activeBeamCount} active fixtures</span>
           </div>
-          <FixtureViewer 
-            fixtures={fixtures} 
-            selectedIds={selectedIds} 
+          <FixtureViewer
+            fixtures={fixtures}
+            selectedIds={selectedIds}
             onSelectFixture={(id) => {
               setSelectedIds((current) =>
                 current.includes(id)
@@ -456,34 +472,59 @@ function App() {
               <input
                 type="range"
                 min={0}
-                max={100}
+                max={360}
                 value={effectSettings.phase}
                 onChange={(event) =>
                   setEffectSettings((current) => ({ ...current, phase: Number(event.target.value) }))
                 }
               />
-              <span>{effectSettings.phase}</span>
+              <span>{effectSettings.phase}°</span>
             </label>
+
+            <div className="tempo-box">
+              <label>
+                Multiplier
+                <select
+                  value={bpmMultiplier}
+                  onChange={(event) => setBpmMultiplier(Number(event.target.value))}
+                >
+                  <option value={1}>1x</option>
+                  <option value={2}>2x</option>
+                  <option value={3}>3x</option>
+                  <option value={4}>4x</option>
+                </select>
+              </label>
+
+              <label>
+                Divider
+                <select
+                  value={bpmDivider}
+                  onChange={(event) => setBpmDivider(Number(event.target.value))}
+                >
+                  <option value={1}>1/1</option>
+                  <option value={2}>1/2</option>
+                  <option value={3}>1/3</option>
+                  <option value={4}>1/4</option>
+                </select>
+              </label>
+            </div>
           </div>
 
           <div className="bpm-bar">
             <div>
               <span className="label">BPM</span>
-              <strong>{bpm}</strong>
+              <strong>{Math.round(effectiveBpm)}</strong>
             </div>
             <button onClick={tapBpm} className="tap-button">Tap BPM</button>
-            <button 
-              className="trigger" 
-              onMouseDown={() => setFlashOn(true)} 
-              onMouseUp={() => setFlashOn(false)} 
+            <button
+              className="trigger"
+              onMouseDown={() => setFlashOn(true)}
+              onMouseUp={() => setFlashOn(false)}
               onMouseLeave={() => setFlashOn(false)}
             >
               Flash Trigger
             </button>
-            <button 
-              className="stop-button"
-              onClick={stopAllEffects}
-            >
+            <button className="stop-button" onClick={stopAllEffects}>
               Stop
             </button>
           </div>
@@ -570,11 +611,11 @@ function App() {
   )
 }
 
-function FixtureViewer({ 
-  fixtures, 
-  selectedIds, 
-  onSelectFixture 
-}: { 
+function FixtureViewer({
+  fixtures,
+  selectedIds,
+  onSelectFixture,
+}: {
   fixtures: Fixture[]
   selectedIds: number[]
   onSelectFixture: (id: number) => void
@@ -590,30 +631,22 @@ function FixtureViewer({
 
   const getColorForLevel = (level: number): string => {
     if (level === 0) {
-      return '#2a2a2a'
+      return '#111820'
     }
-    // Map 0-100 to different red intensities
-    // 0% = dark gray, 100% = full red (#ff0000)
-    const hue = 0
-    const saturation = 100
-    const lightness = (level / 100) * 50 // 0-50% lightness
+
+    const hue = 152
+    const saturation = 88
+    const lightness = 12 + (level / 100) * 46
     return `hsl(${hue}, ${saturation}%, ${lightness}%)`
   }
 
   return (
-    <svg 
+    <svg
       viewBox={`0 0 ${computedWidth} ${computedHeight}`}
       className="fixture-viewer"
       style={{ width: '100%', height: 'auto' }}
     >
-      <rect 
-        x={0} 
-        y={0} 
-        width={computedWidth} 
-        height={computedHeight} 
-        fill="#1a1a1a"
-        rx={8}
-      />
+      <rect x={0} y={0} width={computedWidth} height={computedHeight} fill="#0d1417" rx={8} />
 
       {fixtures.map((fixture, index) => {
         const row = Math.floor(index / fixturesPerRow)
@@ -622,7 +655,7 @@ function FixtureViewer({
         const cy = padding + row * (dotSize + gap) + dotSize / 2
         const isSelected = selectedIds.includes(fixture.id)
         const color = getColorForLevel(fixture.level)
-        const outlineColor = isSelected ? '#b8956a' : 'rgba(255, 255, 255, 0.15)'
+        const outlineColor = isSelected ? '#8ff0d0' : 'rgba(164, 216, 205, 0.22)'
         const outlineWidth = isSelected ? 3 : 2
 
         return (
@@ -643,7 +676,7 @@ function FixtureViewer({
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize="10"
-              fill={fixture.level > 50 ? '#000' : '#aaa'}
+              fill={fixture.level > 50 ? '#02140f' : '#d9f5ef'}
               cursor="pointer"
               pointerEvents="none"
               fontWeight="bold"
